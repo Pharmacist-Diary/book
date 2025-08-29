@@ -32,6 +32,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let scale = 1;
   let panX = 0, panY = 0;
 
+  // ——— التحكم في مصدر الصوت للانقلاب: سهم الواجهة أو سحب من أعلى فقط ———
+  let pendingFlipSoundSource = null; // 'arrow' | 'topdrag' | null
+  let pendingTimer = null;
+  const TOP_DRAG_SOUND_ZONE = 72; // px من أعلى الصفحة لاعتبار السحب "من أعلى"
+  function armFlipSound(source, ttl = 2000) {
+    pendingFlipSoundSource = source;
+    if (pendingTimer) clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => { pendingFlipSoundSource = null; }, ttl);
+  }
+
   // ترقيم الصفحات
   const sourcePages = bookEl.querySelectorAll('.page');
   let pageNum = 0;
@@ -67,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ابدأ من آخر الكتاب
   pageFlip.on('init', (e) => {
-    // الحصول على عدد الصفحات الإجمالي وفتح آخر صفحة
     const lastPageIndex = pageFlip.getPageCount() - 1;
     pageFlip.turnToPage(lastPageIndex);
   });
@@ -294,19 +303,29 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshLayoutCentered();
   updateIndicator(true); // يظهر عند الفتح ثم يختفي
 
+  // ——— تحديد السحب من أعلى لتمكين الصوت عند الانقلاب ———
+  bookEl.addEventListener('pointerdown', (e) => {
+    const rect = bookEl.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if (y <= TOP_DRAG_SOUND_ZONE) {
+      armFlipSound('topdrag', 2500);
+    }
+  }, true);
+
   pageFlip.on('flip', () => {
     const totalPages = pageFlip.getPageCount();
     const currentPageIndex = pageFlip.getCurrentPageIndex();
   
-    // لا تشغل الصوت إذا كانت الصفحة الحالية هي:
-    // - الغلاف الأمامي (0)
-    // - الصفحة الأولى بعد الغلاف (1)
-    // - الغلاف الخلفي (آخر صفحة)
+    // استثناء صفحات معينة من الصوت
     const isExcludedPage = (currentPageIndex === 0) || (currentPageIndex === 1) || (currentPageIndex === totalPages - 1);
     
-    if (!isExcludedPage) {
+    // تشغيل الصوت فقط إذا كان المصدر سهم الواجهة أو سحب من أعلى
+    if (!isExcludedPage && (pendingFlipSoundSource === 'arrow' || pendingFlipSoundSource === 'topdrag')) {
       playFlipSound();
     }
+    // تصفير الحالة
+    pendingFlipSoundSource = null;
+    if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
   
     requestAnimationFrame(() => updateIndicator());
   });
@@ -314,8 +333,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const goForward = () => isRTL ? pageFlip.flipPrev() : pageFlip.flipNext();
   const goBackward = () => isRTL ? pageFlip.flipNext() : pageFlip.flipPrev();
 
-  btnForward.addEventListener('click', goForward);
-  btnBack.addEventListener('click', goBackward);
+  // أزرار الأسهم (واجهة) — نُفعّل الصوت هنا فقط
+  btnForward.addEventListener('click', () => { armFlipSound('arrow'); goForward(); });
+  btnBack.addEventListener('click', () => { armFlipSound('arrow'); goBackward(); });
 
   // لوحة المفاتيح
   window.addEventListener('keydown', (e) => {
@@ -394,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else restoreInitialView();
   });
 
-  // سحب + Pinch
+  // سحب + Pinch (التكبير/التصغير بإصبعين على الهاتف)
   const pointers = new Map();
   let isDragging = false;
   let isPinching = false;
