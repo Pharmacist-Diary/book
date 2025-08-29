@@ -1,0 +1,337 @@
+:root {
+  --paper: #fffdf8;
+  --ink: #222;
+  --muted: #6b7280;
+  --accent: #2a9d8f;
+  --cover-front: #264653;
+  --cover-back: #1d3557;
+  --shadow: rgba(0, 0, 0, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f8;
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Cairo", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+.app-header {
+  text-align: center;
+  padding: 16px 12px 0;
+}
+.app-header h1 { margin: 0 0 6px; font-size: 26px; }
+.app-header p { margin: 0 0 12px; color: var(--muted); }
+
+/* لوحة المساعدة */
+.help-panel[hidden] { display: none; }
+.help-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: grid;
+  place-items: start center;
+  padding-top: 80px;
+  z-index: 10001;
+}
+.help-card {
+  width: min(720px, calc(100% - 32px));
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+  padding: 20px 20px 16px;
+  color: #111;
+  position: relative;
+}
+.help-card h2 { margin: 0 0 10px; font-size: 20px; }
+.help-card ul { margin: 8px 0 6px 0; padding: 0 22px; line-height: 1.7; }
+.help-close {
+  position: absolute;
+  top: 8px; inset-inline-start: 8px;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: #f3f4f6;
+  color: #111;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* الحاوية العامة للكتاب - في المنتصف */
+.book-shell {
+  position: relative;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.book-shell.pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+}
+
+.book-viewport {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 0;
+  background: transparent;
+  user-select: none;
+  touch-action: pan-x pan-y;
+}
+.book-viewport.zoomed { touch-action: none; }
+
+/* عند الزوم: عطّل أحداث المؤشر على عنصر الكتاب عشان السحب يشتغل بسلاسة */
+.book-viewport.zoomed .flip-book { pointer-events: none; }
+
+/* ثبّت طبقات التحريك */
+.pan-wrap { position: relative; }
+.scale-wrap {
+  position: absolute;
+  top: 0; left: 0;
+  transform-origin: top left;
+  will-change: transform;
+}
+
+/* مؤشر شكل المؤشر أثناء السحب */
+.book-viewport.zoomed .pan-wrap { cursor: grab; }
+.pan-wrap.grabbing { cursor: grabbing; }
+
+/* عنصر الكتاب */
+.flip-book {
+  position: relative;
+  transition: none;
+  margin: 0;
+  filter: drop-shadow(0 16px 36px rgba(0,0,0,0.18));
+}
+
+/* خط تجليد خفيف في المنتصف */
+.flip-book::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to bottom,
+    rgba(0,0,0,0.24),
+    rgba(0,0,0,0.10) 40%,
+    rgba(0,0,0,0.10) 60%,
+    rgba(0,0,0,0.24)
+  );
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* الصفحة */
+.page {
+  position: relative;
+  background: linear-gradient(180deg, #fffefb, #fffdf8 22%, #fffefb);
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* تظليل على حواف الصفحات الخارجية */
+.page::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  opacity: 0.55;
+}
+.page:nth-child(odd)::after {
+  right: -1px;
+  background: linear-gradient(to left, rgba(0,0,0,0.14), rgba(0,0,0,0));
+}
+.page:nth-child(even)::after {
+  left: -1px;
+  background: linear-gradient(to right, rgba(0,0,0,0.14), rgba(0,0,0,0));
+}
+
+/* محتوى الصفحة */
+.page-content { padding: 0; font-size: 16px; }
+.page-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.3s ease;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+}
+.page-content img:hover { transform: scale(1.02); }
+.book-viewport.zoomed .page-content img:hover { transform: none; }
+
+/* ترقيم أسفل الصفحات */
+.page-footer {
+  margin-top: auto;
+  padding: 8px 16px;
+  color: var(--muted);
+  border-top: 1px dashed #e5e7eb;
+  background: #fafafa;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* مؤشر الصفحة: يظهر فقط عند التغيير */
+.page-indicator {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 12;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.page-indicator.show { opacity: 1; }
+
+/* الشريط السفلي (أسهم + أدوات) */
+.bottom-ui {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px auto 0;
+  width: auto;
+  padding: 0 10px;
+  transform: translateY(-12px); /* رفع الشريط لأعلى 12px */
+}
+
+/* أسهم التنقل */
+.nav-arrow {
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 6px 16px var(--shadow);
+  transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  opacity: 0.96;
+  backdrop-filter: saturate(140%);
+}
+.nav-arrow:hover { transform: scale(1.06); filter: brightness(1.07); }
+.nav-arrow:active { transform: scale(0.96); }
+.nav-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* شريط الأدوات */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: saturate(150%) blur(8px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.06);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.controls.show { opacity: 1; }
+.ctrl {
+  position: relative;
+  border: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #3bb7aa);
+  cursor: pointer;
+  box-shadow: 0 6px 16px var(--shadow);
+  font-size: 18px;
+  overflow: hidden;
+  transition: transform 0.15s ease, filter 0.2s ease;
+}
+.ctrl:hover { transform: translateY(-1px) scale(1.03); filter: brightness(1.05); }
+.ctrl:active { transform: scale(0.96); }
+.ctrl:disabled { opacity: 0.5; cursor: not-allowed; }
+.divider { width: 1px; height: 22px; background: rgba(0,0,0,0.1); margin: 0 2px; }
+
+/* Ripple */
+.ctrl .ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: rgba(255,255,255,0.6);
+  animation: ripple 600ms ease-out;
+  pointer-events: none;
+}
+@keyframes ripple { to { transform: scale(3.2); opacity: 0; } }
+
+/* في وضع ملء الشاشة: ننقل الشريط السفلي كطبقة فوق الكتاب */
+.book-shell.in-fs .bottom-ui {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translate(-50%, -12px); /* مع الحفاظ على التوسيط أفقيًا ورفعه 12px */
+  width: calc(100% - 20px);
+  justify-content: space-between;
+  z-index: 20;
+}
+.book-shell.in-fs .controls { opacity: 1; } /* إظهار فوري */
+
+/* استجابة */
+@media (max-width: 640px) {
+  .nav-arrow { width: 38px; height: 38px; }
+  .page-content { padding: 0; font-size: 15px; }
+  .ctrl { width: 34px; height: 34px; font-size: 16px; }
+  .page-indicator { bottom: 58px; }
+  .bottom-ui { gap: 8px; }
+}
+
+/* —————— الإضافات المطلوبة —————— */
+/* محاذاة نص المساعدة لليمين داخل البوكس بدون تغيير التموضع */
+.help-card { text-align: right; }
+/* نقل نقط القائمة إلى اليمين وجعل الحشو من اليمين */
+.help-card ul { direction: rtl; padding: 0 22px 0 0; }
+
+/* هاتف فقط: انقل زر إغلاق المساعدة إلى الجهة اليسار داخل البوكس */
+@media (max-width: 640px) {
+  .help-close {
+    inset-inline-start: auto; /* ألغِ محاذاة البداية (يمين في RTL) */
+    inset-inline-end: 8px;    /* ضعّه في النهاية (يسار في RTL) */
+  }
+}
