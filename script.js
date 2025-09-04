@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const isRTL = true;
+  const isRTL = false;
 
   const shell = document.getElementById('bookShell');
   const viewport = document.getElementById('viewport');
@@ -32,16 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let scale = 1;
   let panX = 0, panY = 0;
 
-  // ——— التحكم في مصدر الصوت للانقلاب: سهم الواجهة أو سحب من الزوايا/الأعلى ———
-  let pendingFlipSoundSource = null; // 'arrow' | 'drag' | 'topdrag' | null
-  let pendingTimer = null;
-  const TOP_DRAG_SOUND_ZONE = 72; // px من أعلى الصفحة لاعتبار السحب "من أعلى"
-  function armFlipSound(source, ttl = 2000) {
-    pendingFlipSoundSource = source;
-    if (pendingTimer) clearTimeout(pendingTimer);
-    pendingTimer = setTimeout(() => { pendingFlipSoundSource = null; }, ttl);
-  }
-
   // ترقيم الصفحات
   const sourcePages = bookEl.querySelectorAll('.page');
   let pageNum = 0;
@@ -70,15 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
     flippingTime: 800,
     useMouseWheel: false,
     swipeDistance: 30,
-    direction: 'rtl',
+    direction: 'ltr',
     usePortrait: true
   });
   pageFlip.loadFromHTML(sourcePages);
 
-  // ابدأ من آخر الكتاب
   pageFlip.on('init', () => {
-    const lastPageIndex = pageFlip.getPageCount() - 1;
-    pageFlip.turnToPage(lastPageIndex);
+    pageFlip.turnToPage(0);
   });
 
   const getTotal = () => pageFlip.getPageCount();
@@ -100,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // إظهار المؤشر فقط عند التغيير ولمدة ثانيتين
   let prevIndicatorState = { percent: null, page: null, total: null };
   let indicatorTimer = null;
-  function showIndicatorFor(ms = 1500) {
+  function showIndicatorFor(ms = 2000) {
     indicator.classList.add('show');
     clearTimeout(indicatorTimer);
     indicatorTimer = setTimeout(() => indicator.classList.remove('show'), ms);
@@ -303,57 +291,16 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshLayoutCentered();
   updateIndicator(true); // يظهر عند الفتح ثم يختفي
 
-  // ——— تمكين الصوت عند سحب الطي من أعلى (اختياري، يبقى كما هو) ———
-  bookEl.addEventListener('pointerdown', (e) => {
-    const rect = bookEl.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    if (y <= TOP_DRAG_SOUND_ZONE) {
-      armFlipSound('topdrag', 2500);
-    }
-  }, true);
-
-  // ——— تمكين الصوت عند السحب من زوايا الصفحة (طي) على كل الأجهزة ———
-  const CORNER_SIZE = 72; // حجم الزاوية المسموح بها
-  function isInCorner(e) {
-    const rect = bookEl.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const w = rect.width, h = rect.height;
-    const nearLeft = x <= CORNER_SIZE;
-    const nearRight = x >= w - CORNER_SIZE;
-    const nearTop = y <= CORNER_SIZE;
-    const nearBottom = y >= h - CORNER_SIZE;
-    return (nearLeft && (nearTop || nearBottom)) || (nearRight && (nearTop || nearBottom));
-  }
-  bookEl.addEventListener('pointerdown', (e) => {
-    if (isInCorner(e)) {
-      armFlipSound('drag', 2500);
-    }
-  }, true);
-
   pageFlip.on('flip', () => {
-    // تشغيل الصوت في كل الصفحات بدون استثناءات، عند قدوم الحدث من سهم/سحب
-    if (
-      pendingFlipSoundSource === 'arrow' ||
-      pendingFlipSoundSource === 'topdrag' ||
-      pendingFlipSoundSource === 'drag'
-    ) {
-      playFlipSound();
-    }
-
-    // تصفير الحالة
-    pendingFlipSoundSource = null;
-    if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
-
+    playFlipSound();
     requestAnimationFrame(() => updateIndicator());
   });
-  
+
   const goForward = () => isRTL ? pageFlip.flipPrev() : pageFlip.flipNext();
   const goBackward = () => isRTL ? pageFlip.flipNext() : pageFlip.flipPrev();
 
-  // أزرار الأسهم (واجهة) — نُفعّل الصوت هنا فقط
-  btnForward.addEventListener('click', () => { armFlipSound('arrow'); goForward(); });
-  btnBack.addEventListener('click', () => { armFlipSound('arrow'); goBackward(); });
+  btnForward.addEventListener('click', goForward);
+  btnBack.addEventListener('click', goBackward);
 
   // لوحة المفاتيح
   window.addEventListener('keydown', (e) => {
@@ -370,13 +317,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === '+' || e.key === '=' ) { zoomIn(); return; }
     if (e.key === '-' || e.key === '–') { zoomOut(); return; }
 
-    // تحريك عند الزوم أو تقليب مع الصوت عند الأسهم
+    // تحريك عند الزوم
     if (e.key === 'ArrowLeft') {
       if (scale > 1) { panX -= 80; clampPanAndApply(); e.preventDefault(); }
-      else { armFlipSound('arrow'); goForward(); }
+      else { goForward(); }
     } else if (e.key === 'ArrowRight') {
       if (scale > 1) { panX += 80; clampPanAndApply(); e.preventDefault(); }
-      else { armFlipSound('arrow'); goBackward(); }
+      else { goBackward(); }
     } else if (e.key === 'ArrowUp') {
       if (scale > 1) { panY += 80; clampPanAndApply(); e.preventDefault(); }
     } else if (e.key === 'ArrowDown') {
@@ -432,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else restoreInitialView();
   });
 
-  // سحب + Pinch (التكبير/التصغير بإصبعين على الهاتف)
+  // سحب + Pinch
   const pointers = new Map();
   let isDragging = false;
   let isPinching = false;
@@ -597,7 +544,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.controls')?.classList.add('show');
   });
 
-  // السماح بالshowCover بالسحب من الزوايا فقط، ومنع النقرة في أي مكان آخر
+  // السماح بالتقليب بالسحب من الزوايا فقط، ومنع النقرة في أي مكان آخر
+  const CORNER_SIZE = 72; // حجم الزاوية المسموح بها
+  function isInCorner(e) {
+    const rect = bookEl.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const w = rect.width, h = rect.height;
+    const nearLeft = x <= CORNER_SIZE;
+    const nearRight = x >= w - CORNER_SIZE;
+    const nearTop = y <= CORNER_SIZE;
+    const nearBottom = y >= h - CORNER_SIZE;
+    return (nearLeft && (nearTop || nearBottom)) || (nearRight && (nearTop || nearBottom));
+  }
   function blockFlipIfNotCorner(e) {
     // في وضع الزوم إحنا أصلاً موقفين أحداث الكتاب (CSS) فمش هنمنع السحب
     if (!isInCorner(e)) {
